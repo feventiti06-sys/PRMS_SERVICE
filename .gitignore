@@ -1,0 +1,16 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Spring Boot
+application-local.properties
+application-local.yml
+
+# Build
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
