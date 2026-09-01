@@ -1,10 +1,9 @@
-import { apiClient, ApiResponse } from '@/lib/api';
-import { 
-  Supplier, 
-  SupplierRequest, 
-  SupplierSummary, 
+import { apiClient, type ApiResponse } from '@/lib/api';
+import type {
+  Supplier,
+  SupplierRequest,
+  SupplierSummary,
   SupplierFilter,
-  SupplierPerformance 
 } from '@/features/prms/types/supplier';
 
 export class SupplierService {
@@ -30,8 +29,8 @@ export class SupplierService {
     return apiClient.delete<void>(`${this.basePath}/${id}`);
   }
 
-  async getSupplierPerformance(id: string): Promise<ApiResponse<SupplierPerformance>> {
-    return apiClient.get<SupplierPerformance>(`${this.basePath}/${id}/performance`);
+  async getSupplierPerformance(id: string): Promise<ApiResponse<Record<string, unknown>>> {
+    return apiClient.get<Record<string, unknown>>(`${this.basePath}/${id}/performance`);
   }
 
   async activateSupplier(id: string): Promise<ApiResponse<void>> {
@@ -42,28 +41,8 @@ export class SupplierService {
     return apiClient.post<void>(`${this.basePath}/${id}/deactivate`);
   }
 
-  async getSupplierContacts(id: string): Promise<ApiResponse<any[]>> {
-    return apiClient.get<any[]>(`${this.basePath}/${id}/contacts`);
-  }
-
-  async addSupplierContact(id: string, contact: any): Promise<ApiResponse<any>> {
-    return apiClient.post<any>(`${this.basePath}/${id}/contacts`, contact);
-  }
-
-  async updateSupplierContact(supplierId: string, contactId: string, contact: any): Promise<ApiResponse<any>> {
-    return apiClient.put<any>(`${this.basePath}/${supplierId}/contacts/${contactId}`, contact);
-  }
-
-  async deleteSupplierContact(supplierId: string, contactId: string): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`${this.basePath}/${supplierId}/contacts/${contactId}`);
-  }
-
-  async uploadSupplierDocument(id: string, file: File, documentType: string): Promise<ApiResponse<any>> {
-    return apiClient.upload<any>(`${this.basePath}/${id}/documents`, file, { documentType });
-  }
-
-  async getSupplierDocuments(id: string): Promise<ApiResponse<any[]>> {
-    return apiClient.get<any[]>(`${this.basePath}/${id}/documents`);
+  async uploadSupplierDocument(id: string, file: File, documentType: string): Promise<ApiResponse<unknown>> {
+    return apiClient.post<unknown>(`${this.basePath}/${id}/documents`, { documentType });
   }
 }
 

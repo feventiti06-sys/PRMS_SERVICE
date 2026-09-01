@@ -1,185 +1,136 @@
-/**
- * PRMS Auth Service — Development Placeholder
- *
- * This service provides helper utilities for the PRMS frontend's temporary
- * development login flow.  It is NOT the production authentication mechanism.
- *
- * Production authentication is owned by the shared ERP / Keycloak team.
- * When their integration is ready, this service's login/logout methods
- * should be replaced with calls to their auth endpoints.
- *
- * The three official PRMS roles (as agreed with the shared auth team) are:
- *   • PROCUREMENT_ADMIN
- *   • REQUESTER
- *   • SUPPLIER
- */
+"use client";
 
+import { ROLES, type PRMSRole, type AuthenticatedUser } from '@/features/auth/types/roles';
 import {
-  ROLES,
-  type PRMSRole,
-  type AuthenticatedUser,
-} from "@/features/auth/types/roles";
-
-// ─── Shared types (re-exported for convenience) ───────────────────────────────
+  keycloakLogin,
+  keycloakRefresh,
+  saveTokens,
+  clearTokens,
+  getStoredTokens,
+  getPrmsRoleFromToken,
+  isTokenExpired,
+  type KeycloakTokenResponse,
+} from '@/lib/keycloak';
 
 export type { PRMSRole, AuthenticatedUser };
 
-export interface PRMSDevSession {
+export interface PRMSSession {
   user: AuthenticatedUser;
   role: PRMSRole;
+  accessToken: string;
 }
 
-export interface ApiResponse<T> {
+export interface LoginResult {
   success: boolean;
-  data: T;
-  error?: {
-    message: string;
-    code?: string;
-  };
+  error?: { message: string };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  DEV PLACEHOLDER CREDENTIALS
-//  These are used ONLY for local UI development so the three PRMS roles can
-//  be tested without a live Keycloak server.
-//  Remove / replace when the shared ERP auth integration is available.
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface DevUser {
-  credentials: { username: string; password: string };
-  user: AuthenticatedUser;
-  role: PRMSRole;
+function buildUserFromToken(accessToken: string): AuthenticatedUser | null {
+  try {
+    const base64 = accessToken.split('.')[1];
+    const decoded = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+    const payload = JSON.parse(decoded) as Record<string, unknown>;
+    return {
+      id: String(payload['sub'] ?? ''),
+      username: String(payload['preferred_username'] ?? ''),
+      firstName: String(payload['given_name'] ?? ''),
+      lastName: String(payload['family_name'] ?? ''),
+      email: String(payload['email'] ?? ''),
+      displayName:
+        payload['given_name'] && payload['family_name']
+          ? `${payload['given_name']} ${payload['family_name']}`
+          : String(payload['preferred_username'] ?? ''),
+    };
+  } catch {
+    return null;
+  }
 }
 
-const DEV_USERS: DevUser[] = [
-  {
-    credentials: { username: "procurement_admin", password: "admin123" },
-    user: {
-      id: "dev-1",
-      username: "procurement_admin",
-      firstName: "Procurement",
-      lastName: "Admin",
-      displayName: "Procurement Admin",
-      email: "procurement.admin@insa.edu.et",
-    },
-    role: ROLES.PROCUREMENT_ADMIN,
-  },
-  {
-    credentials: { username: "requester", password: "requester123" },
-    user: {
-      id: "dev-2",
-      username: "requester",
-      firstName: "Abebe",
-      lastName: "Kebede",
-      displayName: "Abebe Kebede",
-      email: "abebe.kebede@insa.edu.et",
-    },
-    role: ROLES.REQUESTER,
-  },
-  {
-    credentials: { username: "supplier", password: "supplier123" },
-    user: {
-      id: "dev-3",
-      username: "supplier",
-      firstName: "Tigist",
-      lastName: "Haile",
-      displayName: "Tigist Haile",
-      email: "tigist.haile@supplier.com",
-    },
-    role: ROLES.SUPPLIER,
-  },
-];
+function saveSession(session: PRMSSession): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('prms_dev_session', JSON.stringify({ user: session.user, role: session.role }));
+  localStorage.setItem('isAuthenticated', 'true');
+}
 
-// ─── Service ──────────────────────────────────────────────────────────────────
+function clearSession(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('prms_dev_session');
+  localStorage.removeItem('isAuthenticated');
+  clearTokens();
+}
 
 export class AuthService {
-  /**
-   * Development-only login.
-   * Validates against the DEV_USERS list and writes a session object to
-   * localStorage under "prms_dev_session" so AuthProvider can pick it up.
-   *
-   * REPLACE with Keycloak / shared ERP auth call in production.
-   */
-  async devLogin(username: string, password: string): Promise<ApiResponse<PRMSDevSession>> {
-    // Simulate network latency
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const match = DEV_USERS.find(
-      (u) => u.credentials.username === username && u.credentials.password === password
-    );
-
-    if (!match) {
-      return {
-        success: false,
-        data: {} as PRMSDevSession,
-        error: { message: "Invalid username or password", code: "INVALID_CREDENTIALS" },
-      };
-    }
-
-    const session: PRMSDevSession = { user: match.user, role: match.role };
-    this.saveDevSession(session);
-
-    return { success: true, data: session };
-  }
-
-  /** Clears the development session from localStorage. */
-  async logout(): Promise<void> {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("prms_dev_session");
-      // Clear legacy keys from the old login page
-      localStorage.removeItem("isAuthenticated");
-      localStorage.removeItem("user");
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-    }
-  }
-
-  // ─── Session helpers ────────────────────────────────────────────────────────
-
-  private saveDevSession(session: PRMSDevSession): void {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("prms_dev_session", JSON.stringify(session));
-      // Write legacy "isAuthenticated" key so the old dashboard layout guard
-      // continues to work until it is refactored.
-      localStorage.setItem("isAuthenticated", "true");
-    }
-  }
-
-  getDevSession(): PRMSDevSession | null {
-    if (typeof window === "undefined") return null;
+  async login(username: string, password: string): Promise<LoginResult> {
     try {
-      const raw = localStorage.getItem("prms_dev_session");
+      const tokens: KeycloakTokenResponse = await keycloakLogin(username, password);
+      const role = getPrmsRoleFromToken(tokens.access_token);
+      if (!role || !Object.values(ROLES).includes(role as PRMSRole)) {
+        return { success: false, error: { message: 'Your account has no PRMS role assigned.' } };
+      }
+      const user = buildUserFromToken(tokens.access_token);
+      if (!user) {
+        return { success: false, error: { message: 'Could not read user info from token.' } };
+      }
+      saveTokens(tokens);
+      saveSession({ user, role: role as PRMSRole, accessToken: tokens.access_token });
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
+      return { success: false, error: { message: msg } };
+    }
+  }
+
+  async logout(): Promise<void> {
+    clearSession();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+  }
+
+  async refreshSessionIfNeeded(): Promise<boolean> {
+    const { accessToken, refreshToken } = getStoredTokens();
+    if (!accessToken || !refreshToken) return false;
+    if (!isTokenExpired(accessToken)) return true;
+    try {
+      const tokens = await keycloakRefresh(refreshToken);
+      const role = getPrmsRoleFromToken(tokens.access_token);
+      const user = buildUserFromToken(tokens.access_token);
+      if (!role || !user) { clearSession(); return false; }
+      saveTokens(tokens);
+      saveSession({ user, role: role as PRMSRole, accessToken: tokens.access_token });
+      return true;
+    } catch {
+      clearSession();
+      return false;
+    }
+  }
+
+  getSession(): { user: AuthenticatedUser; role: PRMSRole } | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('prms_dev_session');
       if (!raw) return null;
-      const parsed = JSON.parse(raw) as Partial<PRMSDevSession>;
+      const parsed = JSON.parse(raw) as Partial<{ user: AuthenticatedUser; role: PRMSRole }>;
       if (!parsed?.user || !parsed?.role) return null;
-      if (!Object.values(ROLES).includes(parsed.role as PRMSRole)) return null;
-      return parsed as PRMSDevSession;
+      if (!Object.values(ROLES).includes(parsed.role)) return null;
+      const { accessToken } = getStoredTokens();
+      if (accessToken && isTokenExpired(accessToken)) return null;
+      return { user: parsed.user, role: parsed.role };
     } catch {
       return null;
     }
   }
 
   isAuthenticated(): boolean {
-    return this.getDevSession() !== null;
+    return this.getSession() !== null;
   }
 
-  /** Returns the dev user's role, or null if not authenticated. */
-  getRole(): PRMSRole | null {
-    return this.getDevSession()?.role ?? null;
-  }
-
-  /** Returns the dev user, or null if not authenticated. */
-  getUser(): AuthenticatedUser | null {
-    return this.getDevSession()?.user ?? null;
-  }
-
-  /** Returns the list of dev placeholder users (for the dev login hint UI). */
   getDevCredentials() {
-    return DEV_USERS.map((u) => ({
-      username: u.credentials.username,
-      password: u.credentials.password,
-      role: u.role,
-    }));
+    return [
+      { username: 'procurement_admin', password: 'admin123', role: ROLES.PROCUREMENT_ADMIN },
+      { username: 'requester', password: 'requester123', role: ROLES.REQUESTER },
+      { username: 'supplier', password: 'supplier123', role: ROLES.SUPPLIER },
+    ];
   }
 }
 

@@ -27,5 +27,6 @@ public interface PurchaseOrderMapper {
     @Mapping(target = "purchaseRequisitionId", source = "purchaseRequisition.id")
     @Mapping(target = "vendorId", source = "vendor.id")
     @Mapping(target = "vendorName", source = "vendor.name")
+    @Mapping(target = "createdAt", source = "createdAt")
     PurchaseOrderResponse toResponse(PurchaseOrder entity);
 }

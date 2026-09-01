@@ -1,10 +1,10 @@
-import { apiClient, ApiResponse } from '@/lib/api';
-import { 
-  PurchaseRequest, 
-  PurchaseRequestRequest, 
-  PurchaseRequestSummary, 
+import { apiClient, type ApiResponse } from '@/lib/api';
+import type {
+  PurchaseRequest,
+  PurchaseRequestRequest,
+  PurchaseRequestSummary,
   PurchaseRequestFilter,
-  PurchaseRequestStats
+  PurchaseRequestStats,
 } from '@/features/prms/types/purchase-request';
 
 export class PurchaseRequestService {
@@ -34,32 +34,8 @@ export class PurchaseRequestService {
     return apiClient.post<void>(`${this.basePath}/${id}/submit`);
   }
 
-  async cancelPurchaseRequest(id: string, reason: string): Promise<ApiResponse<void>> {
-    return apiClient.post<void>(`${this.basePath}/${id}/cancel`, { reason });
-  }
-
   async getPurchaseRequestStats(): Promise<ApiResponse<PurchaseRequestStats>> {
     return apiClient.get<PurchaseRequestStats>(`${this.basePath}/stats`);
-  }
-
-  async getPurchaseRequestApprovals(id: string): Promise<ApiResponse<any[]>> {
-    return apiClient.get<any[]>(`${this.basePath}/${id}/approvals`);
-  }
-
-  async getPurchaseRequestHistory(id: string): Promise<ApiResponse<any[]>> {
-    return apiClient.get<any[]>(`${this.basePath}/${id}/history`);
-  }
-
-  async uploadPurchaseRequestAttachment(id: string, file: File, description?: string): Promise<ApiResponse<any>> {
-    return apiClient.upload<any>(`${this.basePath}/${id}/attachments`, file, { description });
-  }
-
-  async deletePurchaseRequestAttachment(prId: string, attachmentId: string): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`${this.basePath}/${prId}/attachments/${attachmentId}`);
-  }
-
-  async duplicatePurchaseRequest(id: string): Promise<ApiResponse<PurchaseRequest>> {
-    return apiClient.post<PurchaseRequest>(`${this.basePath}/${id}/duplicate`);
   }
 }
 

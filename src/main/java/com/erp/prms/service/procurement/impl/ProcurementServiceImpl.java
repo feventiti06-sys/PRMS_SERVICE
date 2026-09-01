@@ -15,7 +15,9 @@ import com.erp.prms.util.POGenerator;
 import com.erp.prms.validator.ProcurementPolicyValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @Transactional
@@ -36,8 +38,7 @@ public class ProcurementServiceImpl implements ProcurementService {
             PurchaseOrderMapper mapper,
             POGenerator generator,
             ProcurementPolicyValidator policy,
-            ProcurementEventPublisher events
-    ) {
+            ProcurementEventPublisher events) {
         this.po = po;
         this.pr = pr;
         this.vendors = vendors;
@@ -49,20 +50,20 @@ public class ProcurementServiceImpl implements ProcurementService {
 
     @Override
     public PurchaseOrderResponse createPurchaseOrder(PurchaseOrderCreateRequest request) {
-        PurchaseOrder entity = mapper.toEntity(request);
         var requisition = pr.findById(request.getPurchaseRequisitionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Requisition not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Requisition not found: " + request.getPurchaseRequisitionId()));
 
         if (requisition.getStatus() != PRStatus.APPROVED) {
             throw new IllegalStateException("Only approved requisitions can create POs");
         }
 
         var vendor = vendors.findById(request.getVendorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found: " + request.getVendorId()));
 
         policy.validateVendor(vendor);
         policy.validateAmount(request.getTotalAmount());
 
+        PurchaseOrder entity = mapper.toEntity(request);
         entity.setPurchaseOrderNumber(generator.next());
         entity.setPurchaseRequisition(requisition);
         entity.setVendor(vendor);
@@ -79,7 +80,15 @@ public class ProcurementServiceImpl implements ProcurementService {
     @Transactional(readOnly = true)
     public PurchaseOrderResponse getPurchaseOrder(Long id) {
         return mapper.toResponse(po.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found")));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found: " + id)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PurchaseOrderResponse> listAll() {
+        return po.findAll().stream()
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .map(mapper::toResponse)
+                .toList();
     }
 }
-

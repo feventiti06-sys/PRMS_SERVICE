@@ -1,51 +1,39 @@
-/**
- * React Query hooks for the Invoice API.
- *
- * Backend endpoint:
- *   POST /api/v1/invoices  ← InvoiceRequest → InvoiceEntity
- *
- * IMPORTANT: The backend only exposes a POST (submit) endpoint for invoices.
- * There is no GET-list or GET-by-id endpoint at this time.
- * The invoice list page continues to display demo data; only the submit
- * flow is connected to the real backend.
- *
- * NOTE: All calls require a valid Keycloak JWT in localStorage("access_token").
- */
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { invoiceApi, InvoiceRequest, handleApiError, isApiError } from '@/lib/prms-api';
+import { queryKeys } from '@/lib/api';
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import {
-  invoiceApi,
-  InvoiceRequest,
-  handleApiError,
-  isApiError,
-} from "@/lib/prms-api";
-import { queryKeys } from "@/lib/api";
+export function useInvoices() {
+  return useQuery({
+    queryKey: queryKeys.invoices,
+    queryFn: () => invoiceApi.list(),
+    staleTime: 2 * 60 * 1000,
+  });
+}
 
-// ─── Mutations ────────────────────────────────────────────────────────────────
+export function useInvoice(id: number | string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.invoice(String(id)),
+    queryFn: () => invoiceApi.getById(id!),
+    enabled: id != null,
+    staleTime: 2 * 60 * 1000,
+  });
+}
 
-/** Submit an invoice to the finance integration service. */
 export function useSubmitInvoice() {
   const qc = useQueryClient();
   const { toast } = useToast();
-
   return useMutation({
     mutationFn: (body: InvoiceRequest) => invoiceApi.submit(body),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.invoices });
-      qc.invalidateQueries({
-        queryKey: queryKeys.purchaseOrder(String(data.purchaseOrderId)),
-      });
-      toast({
-        title: "Invoice submitted",
-        description: `Invoice ${data.invoiceNumber} has been submitted to finance.`,
-      });
+      toast({ title: 'Invoice submitted', description: `${data.invoiceNumber} submitted.` });
     },
     onError: (err) => {
       toast({
-        title: "Failed to submit invoice",
-        description: isApiError(err) ? handleApiError(err) : "An unexpected error occurred.",
-        variant: "destructive",
+        title: 'Failed to submit invoice',
+        description: isApiError(err) ? handleApiError(err) : 'Unexpected error.',
+        variant: 'destructive',
       });
     },
   });

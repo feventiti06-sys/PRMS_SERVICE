@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 
 @Getter @Setter @NoArgsConstructor
@@ -23,4 +24,5 @@ public class PurchaseOrderResponse {
     private LocalDate orderDate;
     private LocalDate expectedDeliveryDate;
     private LocalDate expiryDate;
+    private Instant createdAt;
 }

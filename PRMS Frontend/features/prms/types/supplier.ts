@@ -118,6 +118,7 @@ export interface PagedResponse<T> {
 }
 
 export interface SupplierFilter {
+  [key: string]: unknown;
   status?: SupplierStatus;
   category?: string;
   search?: string;

@@ -1,13 +1,12 @@
 package com.erp.prms.service.rfp;
 
 import com.erp.prms.dto.request.RFQCreateRequest;
-import com.erp.prms.entity.RFQ;
+import com.erp.prms.dto.response.RFQResponse;
+
+import java.util.List;
 
 public interface RFQService {
-
-    /** Issues an RFQ for a requisition. */
-    RFQ create(RFQCreateRequest request);
-
-    /** Retrieves an RFQ. */
-    RFQ getById(Long id);
+    RFQResponse create(RFQCreateRequest request);
+    RFQResponse getById(Long id);
+    List<RFQResponse> listAll();
 }

@@ -1,35 +1,17 @@
 "use client";
 
-/**
- * PRMS Development Login Page
- *
- * ⚠️  TEMPORARY DEVELOPMENT PLACEHOLDER — NOT THE PRODUCTION AUTH SYSTEM
- *
- * In production, authentication is handled by the shared ERP login page
- * and Keycloak (owned by the shared-auth team).  This page exists only
- * for local UI development so the three PRMS roles can be exercised
- * without a live Keycloak server.
- */
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Eye,
-  EyeOff,
-  Lock,
-  User,
-  Shield,
-  AlertCircle,
-  Loader2,
-  Info,
+  Eye, EyeOff, Lock, User, Shield, AlertCircle, Loader2, Info,
 } from "lucide-react";
 import { authService } from "@/features/auth/services/auth-service";
-import { ROLES, getRoleDisplayName } from "@/features/auth/types/roles";
+import { getRoleDisplayName } from "@/features/auth/types/roles";
 
-export default function DevLoginPage() {
+export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({ username: "", password: "" });
@@ -50,10 +32,7 @@ export default function DevLoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await authService.devLogin(
-        formData.username.trim(),
-        formData.password
-      );
+      const result = await authService.login(formData.username.trim(), formData.password);
       if (result.success) {
         router.replace("/prms");
       } else {
@@ -75,14 +54,13 @@ export default function DevLoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* ── Brand panel (left, hidden on mobile) ────────────────────────── */}
-      <aside className="relative hidden flex-1 flex-col items-center justify-center overflow-hidden md:flex"
+      <aside
+        className="relative hidden flex-1 flex-col items-center justify-center overflow-hidden md:flex"
         style={{
           background:
             "radial-gradient(1200px 600px at 30% 40%, #0d2a5c 0%, #0a1f44 60%, #071634 100%)",
         }}
       >
-        {/* decorative rings */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -91,62 +69,39 @@ export default function DevLoginPage() {
               "radial-gradient(circle at 45% 45%, transparent 0 118px, rgba(255,255,255,0.05) 118px 120px, transparent 120px 218px, rgba(255,255,255,0.04) 218px 220px, transparent 220px 330px, rgba(255,255,255,0.03) 330px 332px, transparent 332px)",
           }}
         />
-
         <div className="relative max-w-[480px] text-center px-12">
-          {/* Logo box */}
           <div className="mx-auto mb-8 grid h-[190px] w-[190px] place-items-center rounded-[28px] border border-white/10 bg-white/5 backdrop-blur-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/insa.jpg"
-              alt="INSA"
-              className="h-[74%] w-[74%] object-contain"
-            />
+            <img src="/insa.jpg" alt="INSA" className="h-[74%] w-[74%] object-contain" />
           </div>
-
-          {/* Decorative divider */}
           <div className="mb-6 flex items-center justify-center gap-1.5">
             <span className="h-[3px] w-11 rounded-sm bg-[#c1121f]" />
             <span className="h-[9px] w-[9px] rounded-full bg-[#c1121f]" />
             <span className="h-[3px] w-11 rounded-sm bg-[#1e50c8]" />
           </div>
-
           <h1 className="mb-3 text-[2.2rem] font-extrabold leading-tight text-white">
             Information Network Security Administration
           </h1>
           <p className="text-white/55">Addis Ababa, Ethiopia</p>
         </div>
-
         <footer className="absolute inset-x-0 bottom-6 text-center text-xs text-white/40">
           © 2026 Information Network Security Administration
         </footer>
       </aside>
 
-      {/* ── Sign-in panel (right) ─────────────────────────────────────────── */}
       <main className="grid flex-1 place-items-center bg-[#f4f6fb] p-8">
         <div className="w-full max-w-[440px] space-y-5">
-          {/* Mobile logo */}
           <div className="flex flex-col items-center gap-2 md:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/insa.jpg"
-              alt="INSA"
-              className="h-[72px] w-[72px] object-contain"
-            />
+            <img src="/insa.jpg" alt="INSA" className="h-[72px] w-[72px] object-contain" />
             <span className="text-lg font-bold text-[#0a1f44]">INSA ERP System</span>
           </div>
-
-          {/* Desktop heading */}
           <div className="hidden flex-col items-center gap-2 md:flex">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/insa.jpg"
-              alt="INSA"
-              className="h-[88px] w-[88px] object-contain"
-            />
+            <img src="/insa.jpg" alt="INSA" className="h-[88px] w-[88px] object-contain" />
             <span className="text-xl font-bold text-[#0a1f44]">INSA ERP System</span>
           </div>
 
-          {/* Card */}
           <div className="rounded-2xl bg-white p-8 shadow-[0_12px_40px_rgba(10,31,68,0.1)]">
             <h2 className="mb-1 flex items-center gap-2 text-2xl font-semibold text-[#14213d]">
               <Shield className="h-5 w-5 text-[#c1121f]" />
@@ -157,12 +112,8 @@ export default function DevLoginPage() {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Username */}
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="username"
-                  className="text-xs font-bold uppercase tracking-wider text-gray-500"
-                >
+                <Label htmlFor="username" className="text-xs font-bold uppercase tracking-wider text-gray-500">
                   Username
                 </Label>
                 <div className="relative">
@@ -180,12 +131,8 @@ export default function DevLoginPage() {
                 </div>
               </div>
 
-              {/* Password */}
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="password"
-                  className="text-xs font-bold uppercase tracking-wider text-gray-500"
-                >
+                <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-gray-500">
                   Password
                 </Label>
                 <div className="relative">
@@ -206,16 +153,11 @@ export default function DevLoginPage() {
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* Error */}
               {error && (
                 <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -223,7 +165,6 @@ export default function DevLoginPage() {
                 </div>
               )}
 
-              {/* Submit */}
               <Button
                 type="submit"
                 size="lg"
@@ -231,34 +172,25 @@ export default function DevLoginPage() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in…
-                  </>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in…</>
                 ) : (
-                  <>
-                    <Shield className="mr-2 h-4 w-4" />
-                    Sign In Securely
-                  </>
+                  <><Shield className="mr-2 h-4 w-4" />Sign In Securely</>
                 )}
               </Button>
             </form>
 
             <div className="my-5 h-px bg-gray-200" />
-
             <p className="flex items-start gap-2 text-xs leading-relaxed text-gray-500">
               <Lock className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-              This system is protected under the INSA Security Policy. Unauthorized
-              access attempts are logged and monitored.
+              This system is protected under the INSA Security Policy. Unauthorized access attempts are logged and monitored.
             </p>
           </div>
 
-          {/* Dev credentials */}
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <Info className="h-4 w-4 text-amber-600" />
               <span className="text-xs font-semibold text-amber-700">
-                Development placeholder — click to fill
+                Test accounts — click to fill
               </span>
             </div>
             <div className="space-y-2">
@@ -270,12 +202,8 @@ export default function DevLoginPage() {
                   className="flex w-full items-center justify-between rounded-lg border border-amber-200 bg-white px-3 py-2 text-left hover:border-[#c1121f] hover:bg-red-50 transition-colors"
                 >
                   <div>
-                    <span className="font-mono text-sm font-medium text-gray-800">
-                      {cred.username}
-                    </span>
-                    <span className="ml-2 font-mono text-xs text-gray-400">
-                      / {cred.password}
-                    </span>
+                    <span className="font-mono text-sm font-medium text-gray-800">{cred.username}</span>
+                    <span className="ml-2 font-mono text-xs text-gray-400">/ {cred.password}</span>
                   </div>
                   <span className="text-xs font-semibold text-[#c1121f]">
                     {getRoleDisplayName(cred.role)}

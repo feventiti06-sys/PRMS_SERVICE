@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/purchase-orders")
 public class PurchaseOrderController {
@@ -24,14 +26,17 @@ public class PurchaseOrderController {
     }
 
     @PostMapping
-    public ResponseEntity<PurchaseOrderResponse> create(
-            @Valid @RequestBody PurchaseOrderCreateRequest request
-    ) {
+    public ResponseEntity<PurchaseOrderResponse> create(@Valid @RequestBody PurchaseOrderCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.createPurchaseOrder(request));
     }
 
     @GetMapping("/{id}")
-    public PurchaseOrderResponse get(@PathVariable Long id) {
+    public PurchaseOrderResponse getById(@PathVariable Long id) {
         return service.getPurchaseOrder(id);
+    }
+
+    @GetMapping
+    public List<PurchaseOrderResponse> list() {
+        return service.listAll();
     }
 }

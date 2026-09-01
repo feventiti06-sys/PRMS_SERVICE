@@ -100,6 +100,7 @@ export interface PurchaseRequestSummary {
 }
 
 export interface PurchaseRequestFilter {
+  [key: string]: unknown;
   status?: PurchaseRequestStatus;
   priority?: PurchaseRequestPriority;
   departmentId?: string;

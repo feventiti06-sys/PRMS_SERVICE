@@ -8,10 +8,6 @@ import { AuthProvider } from "@/features/auth/contexts/auth-context";
 import { useAuth } from "@/features/auth/contexts/auth-context";
 import { Loader2, Shield } from "lucide-react";
 
-/**
- * Inner guard — reads from AuthProvider (already mounted by the outer wrapper).
- * Redirects to /login when no dev session is present.
- */
 function DashboardGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();

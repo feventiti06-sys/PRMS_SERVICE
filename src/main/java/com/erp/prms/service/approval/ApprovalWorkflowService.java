@@ -3,12 +3,9 @@ package com.erp.prms.service.approval;
 import com.erp.prms.dto.request.RequisitionApproveRequest;
 import com.erp.prms.dto.response.RequisitionResponse;
 
-public interface ApprovalWorkflowService {
+import java.util.List;
 
-    /** Applies the current approver's decision to a requisition. */
-    RequisitionResponse decide(
-            Long requisitionId,
-            String approverEmployeeId,
-            RequisitionApproveRequest request
-    );
+public interface ApprovalWorkflowService {
+    RequisitionResponse decide(Long requisitionId, String approverEmployeeId, RequisitionApproveRequest request);
+    List<RequisitionResponse> listPending();
 }

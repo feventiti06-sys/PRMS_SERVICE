@@ -8,9 +8,11 @@ import com.erp.prms.exception.ResourceNotFoundException;
 import com.erp.prms.mapper.PurchaseRequisitionMapper;
 import com.erp.prms.repository.PurchaseRequisitionRepository;
 import com.erp.prms.service.approval.ApprovalWorkflowService;
-import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
 
 @Service
 @Transactional
@@ -21,8 +23,7 @@ public class ApprovalWorkflowServiceImpl implements ApprovalWorkflowService {
 
     public ApprovalWorkflowServiceImpl(
             PurchaseRequisitionRepository requisitions,
-            PurchaseRequisitionMapper mapper
-    ) {
+            PurchaseRequisitionMapper mapper) {
         this.requisitions = requisitions;
         this.mapper = mapper;
     }
@@ -31,13 +32,12 @@ public class ApprovalWorkflowServiceImpl implements ApprovalWorkflowService {
     public RequisitionResponse decide(
             Long requisitionId,
             String approverEmployeeId,
-            RequisitionApproveRequest request
-    ) {
+            RequisitionApproveRequest request) {
         var requisition = requisitions.findById(requisitionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Requisition not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Requisition not found: " + requisitionId));
         var workflow = requisition.getApprovalWorkflow();
         if (workflow == null) {
-            throw new ApprovalWorkflowException("No workflow assigned");
+            throw new ApprovalWorkflowException("No workflow assigned to this requisition");
         }
 
         var stage = workflow.getStages().stream()
@@ -46,7 +46,7 @@ public class ApprovalWorkflowServiceImpl implements ApprovalWorkflowService {
                 .orElseThrow(() -> new ApprovalWorkflowException("Current approval stage not found"));
 
         if (!stage.getApproverEmployeeId().equals(approverEmployeeId)) {
-            throw new ApprovalWorkflowException("Employee is not current approver");
+            throw new ApprovalWorkflowException("You are not the current approver for this requisition");
         }
 
         stage.setAction(request.getAction());
@@ -55,15 +55,27 @@ public class ApprovalWorkflowServiceImpl implements ApprovalWorkflowService {
 
         switch (request.getAction()) {
             case REJECT -> requisition.setStatus(PRStatus.REJECTED);
-            case RETURN -> requisition.setStatus(PRStatus.DRAFT);
+            case RETURN -> {
+                requisition.setStatus(PRStatus.DRAFT);
+                workflow.setCurrentStageOrder(1);
+            }
             case APPROVE -> {
-                workflow.setCurrentStageOrder(workflow.getCurrentStageOrder() + 1);
-                if (workflow.getCurrentStageOrder() > workflow.getStages().size()) {
+                int nextStage = workflow.getCurrentStageOrder() + 1;
+                workflow.setCurrentStageOrder(nextStage);
+                if (nextStage > workflow.getStages().size()) {
                     requisition.setStatus(PRStatus.APPROVED);
                 }
             }
         }
 
         return mapper.toResponse(requisition);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RequisitionResponse> listPending() {
+        return requisitions.findByStatusOrderByCreatedAtAsc(PRStatus.PENDING_APPROVAL).stream()
+                .map(mapper::toResponse)
+                .toList();
     }
 }

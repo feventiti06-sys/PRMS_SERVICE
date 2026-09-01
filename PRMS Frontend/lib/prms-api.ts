@@ -1,97 +1,11 @@
-/**
- * PRMS Backend-Aligned API Service Layer
- *
- * This file is the single integration point between the frontend and the
- * Spring Boot PRMS backend.  It maps:
- *
- *   Frontend concept  →  Backend endpoint  →  Backend DTO
- *
- * ─── ENDPOINT MAP ────────────────────────────────────────────────────────────
- *
- *  Vendors (displayed as "Suppliers" in the UI)
- *    GET    /vendors          → VendorResponse[]
- *    GET    /vendors/{id}     → VendorResponse
- *    POST   /vendors          ← VendorCreateRequest → VendorResponse
- *
- *  Purchase Requisitions (displayed as "Purchase Requests" in the UI)
- *    GET    /requisitions?requesterEmployeeId={id} → RequisitionResponse[]
- *    GET    /requisitions/{id}                     → RequisitionResponse
- *    POST   /requisitions     ← RequisitionCreateRequest → RequisitionResponse
- *    POST   /requisitions/{id}/submit              → RequisitionResponse
- *
- *  Approvals
- *    POST   /approvals/requisitions/{id} ← RequisitionApproveRequest → RequisitionResponse
- *
- *  RFQ
- *    GET    /rfqs/{id}        → RFQ entity
- *    POST   /rfqs             ← RFQCreateRequest → RFQ entity
- *
- *  Purchase Orders
- *    GET    /purchase-orders/{id}  → PurchaseOrderResponse
- *    POST   /purchase-orders       ← PurchaseOrderCreateRequest → PurchaseOrderResponse
- *
- *  Goods Receipts
- *    GET    /goods-receipts/{id}   → GoodsReceiptNote entity
- *    POST   /goods-receipts        ← GoodsReceiptRequest → GoodsReceiptNote entity
- *
- *  Invoices
- *    POST   /invoices         ← InvoiceRequest → Invoice entity
- *
- * ─── AUTHENTICATION ───────────────────────────────────────────────────────────
- *
- *  All endpoints require a valid Keycloak JWT in the Authorization header.
- *  The token is read from localStorage key "access_token", which is set by the
- *  shared ERP authentication layer once Keycloak integration is complete.
- *
- *  During local development, obtain a token from Keycloak and store it manually:
- *    localStorage.setItem("access_token", "<your-jwt-here>")
- *
- * ─── ENUM MAPPING ─────────────────────────────────────────────────────────────
- *
- *  The backend uses different enum values than the frontend UI layer.
- *  This file defines the backend enums as TypeScript const objects so the rest
- *  of the frontend uses the correct values when calling the API.
- *
- *  PRStatus   (backend): DRAFT | PENDING_APPROVAL | APPROVED | REJECTED | PO_CREATED
- *  POStatus   (backend): DRAFT | SENT | CONFIRMED | PARTIALLY_RECEIVED | COMPLETED | CANCELLED
- *  PaymentTerms         : NET_15 | NET_30 | NET_60 | COD
- *  VendorType           : INDIVIDUAL | CORPORATE | GOVERNMENT
- *  ApprovalAction       : APPROVE | REJECT | RETURN
- */
+import { apiClient, ApiError, handleApiError, isApiError } from '@/lib/api';
 
-import { apiClient, ApiError, handleApiError, isApiError } from "@/lib/api";
+export type BackendPRStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'PO_CREATED';
+export type BackendPOStatus = 'DRAFT' | 'SENT' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'COMPLETED' | 'CANCELLED';
+export type BackendPaymentTerms = 'NET_15' | 'NET_30' | 'NET_60' | 'COD';
+export type BackendVendorType = 'INDIVIDUAL' | 'CORPORATE' | 'GOVERNMENT';
+export type BackendApprovalAction = 'APPROVE' | 'REJECT' | 'RETURN';
 
-// ─── Backend enum types ───────────────────────────────────────────────────────
-
-/** PRStatus enum values as defined in the backend entity. */
-export type BackendPRStatus =
-  | "DRAFT"
-  | "PENDING_APPROVAL"
-  | "APPROVED"
-  | "REJECTED"
-  | "PO_CREATED";
-
-/** POStatus enum values as defined in the backend entity. */
-export type BackendPOStatus =
-  | "DRAFT"
-  | "SENT"
-  | "CONFIRMED"
-  | "PARTIALLY_RECEIVED"
-  | "COMPLETED"
-  | "CANCELLED";
-
-/** PaymentTerms enum values as defined in the backend entity. */
-export type BackendPaymentTerms = "NET_15" | "NET_30" | "NET_60" | "COD";
-
-/** VendorType enum values as defined in the backend entity. */
-export type BackendVendorType = "INDIVIDUAL" | "CORPORATE" | "GOVERNMENT";
-
-/** ApprovalAction enum values as defined in the backend entity. */
-export type BackendApprovalAction = "APPROVE" | "REJECT" | "RETURN";
-
-// ─── Backend response DTOs ────────────────────────────────────────────────────
-
-/** Maps to com.erp.prms.dto.response.VendorResponse */
 export interface VendorResponse {
   id: number;
   vendorCode: string;
@@ -106,7 +20,6 @@ export interface VendorResponse {
   performanceScore: number | null;
 }
 
-/** Maps to com.erp.prms.dto.response.RequisitionResponse */
 export interface RequisitionResponse {
   id: number;
   requisitionNumber: string;
@@ -116,12 +29,11 @@ export interface RequisitionResponse {
   itemDetails: string;
   estimatedAmount: number;
   status: BackendPRStatus;
-  requiredByDate: string; // LocalDate → "YYYY-MM-DD"
+  requiredByDate: string;
   approvalWorkflowId: number | null;
-  createdAt: string; // Instant → ISO-8601
+  createdAt: string;
 }
 
-/** Maps to com.erp.prms.dto.response.PurchaseOrderResponse */
 export interface PurchaseOrderResponse {
   id: number;
   purchaseOrderNumber: string;
@@ -132,60 +44,95 @@ export interface PurchaseOrderResponse {
   totalAmount: number;
   paymentTerms: BackendPaymentTerms;
   status: BackendPOStatus;
-  orderDate: string; // LocalDate
-  expectedDeliveryDate: string; // LocalDate
-  expiryDate: string | null; // LocalDate
+  orderDate: string;
+  expectedDeliveryDate: string;
+  expiryDate: string | null;
+  createdAt?: string;
 }
 
-/**
- * RFQ entity — the RFQ controller returns the entity directly (not a DTO).
- * Only the fields actually present in the entity are listed here.
- */
-export interface RFQEntity {
+export interface RFQResponse {
   id: number;
   rfqNumber: string;
   title: string;
   itemDetails: string;
-  submissionDeadline: string; // LocalDate
-  status: string;
+  submissionDeadline: string;
+  active: boolean;
   purchaseRequisitionId: number;
+  requisitionNumber: string | null;
   createdAt: string;
 }
 
-/**
- * GoodsReceiptNote entity — returned directly by the goods-receipt controller.
- */
-export interface GoodsReceiptNoteEntity {
+export interface GoodsReceiptResponse {
   id: number;
-  grnNumber?: string;
+  receiptNumber: string;
   purchaseOrderId: number;
-  receiptDate: string; // LocalDate
+  purchaseOrderNumber: string;
+  vendorName: string;
+  receiptDate: string;
   receivedByEmployeeId: string;
   receiptDetails: string;
   inspectionNotes: string | null;
   accepted: boolean;
-  createdAt?: string;
+  createdAt: string;
 }
 
-/**
- * Invoice entity — returned directly by the invoice controller.
- */
-export interface InvoiceEntity {
+export interface InvoiceResponse {
   id: number;
   invoiceNumber: string;
   purchaseOrderId: number;
+  purchaseOrderNumber: string;
   vendorId: number;
+  vendorName: string;
   invoiceAmount: number;
-  invoiceDate: string; // LocalDate
-  dueDate: string; // LocalDate
+  invoiceDate: string;
+  dueDate: string;
+  processingStatus: string;
   itemDetails: string | null;
-  status?: string;
-  createdAt?: string;
+  financeReference: string | null;
+  createdAt: string;
 }
 
-// ─── Backend request DTOs ─────────────────────────────────────────────────────
+export interface ContractResponse {
+  id: number;
+  contractNumber: string;
+  vendorId: number;
+  vendorName: string;
+  purchaseOrderId: number | null;
+  purchaseOrderNumber: string | null;
+  contractValue: number;
+  startDate: string;
+  endDate: string;
+  termsAndConditions: string;
+  active: boolean;
+  createdAt: string;
+}
 
-/** Maps to com.erp.prms.dto.request.VendorCreateRequest */
+export interface QuotationResponse {
+  id: number;
+  quotationNumber: string;
+  rfqId: number;
+  rfqNumber: string;
+  vendorId: number;
+  vendorName: string;
+  quotationDate: string;
+  validUntil: string;
+  totalAmount: number;
+  selected: boolean;
+  createdAt: string;
+}
+
+export interface DashboardStatsResponse {
+  totalRequisitions: number;
+  pendingApprovals: number;
+  activeVendors: number;
+  openRfqs: number;
+  totalPurchaseOrders: number;
+  pendingGoodsReceipts: number;
+  pendingInvoices: number;
+  totalPurchaseOrderValue: number;
+  pendingInvoiceValue: number;
+}
+
 export interface VendorCreateRequest {
   name: string;
   vendorType: BackendVendorType;
@@ -196,205 +143,199 @@ export interface VendorCreateRequest {
   paymentTerms: BackendPaymentTerms;
 }
 
-/** Maps to com.erp.prms.dto.request.RequisitionCreateRequest */
 export interface RequisitionCreateRequest {
   requesterEmployeeId: string;
   departmentCode: string;
   purpose: string;
   itemDetails: string;
-  estimatedAmount: number; // BigDecimal — send as number
-  requiredByDate: string;  // LocalDate → "YYYY-MM-DD"
+  estimatedAmount: number;
+  requiredByDate: string;
 }
 
-/** Maps to com.erp.prms.dto.request.RequisitionApproveRequest */
 export interface RequisitionApproveRequest {
   action: BackendApprovalAction;
   comments?: string;
 }
 
-/** Maps to com.erp.prms.dto.request.RFQCreateRequest */
 export interface RFQCreateRequest {
   purchaseRequisitionId: number;
   title: string;
   itemDetails: string;
-  submissionDeadline: string; // LocalDate → "YYYY-MM-DD" (must be future)
+  submissionDeadline: string;
 }
 
-/** Maps to com.erp.prms.dto.request.PurchaseOrderCreateRequest */
 export interface PurchaseOrderCreateRequest {
   purchaseRequisitionId: number;
   vendorId: number;
   itemDetails: string;
-  totalAmount: number; // BigDecimal
+  totalAmount: number;
   paymentTerms: BackendPaymentTerms;
-  expectedDeliveryDate: string; // LocalDate
-  expiryDate?: string;          // LocalDate
+  expectedDeliveryDate: string;
+  expiryDate?: string;
 }
 
-/** Maps to com.erp.prms.dto.request.GoodsReceiptRequest */
 export interface GoodsReceiptRequest {
   purchaseOrderId: number;
-  receiptDate: string;           // LocalDate
+  receiptDate: string;
   receivedByEmployeeId: string;
   receiptDetails: string;
   inspectionNotes?: string;
   accepted: boolean;
 }
 
-/** Maps to com.erp.prms.dto.request.InvoiceRequest */
 export interface InvoiceRequest {
   invoiceNumber: string;
   purchaseOrderId: number;
   vendorId: number;
-  invoiceAmount: number; // BigDecimal
-  invoiceDate: string;   // LocalDate
-  dueDate: string;       // LocalDate
+  invoiceAmount: number;
+  invoiceDate: string;
+  dueDate: string;
   itemDetails?: string;
 }
 
-// ─── Vendor / Supplier API ────────────────────────────────────────────────────
+export interface ContractCreateRequest {
+  vendorId: number;
+  purchaseOrderId: number;
+  contractValue: number;
+  startDate: string;
+  endDate: string;
+  termsAndConditions: string;
+}
+
+export interface QuotationCreateRequest {
+  rfqId: number;
+  vendorId: number;
+  quotationDate: string;
+  validUntil: string;
+  totalAmount: number;
+}
 
 export const vendorApi = {
-  /** GET /api/v1/vendors — list all active vendors */
   list: (): Promise<VendorResponse[]> =>
-    apiClient.get<VendorResponse[]>("/vendors").then((r) => r.data),
-
-  /** GET /api/v1/vendors/{id} */
+    apiClient.get<VendorResponse[]>('/vendors').then((r) => r.data),
   getById: (id: number | string): Promise<VendorResponse> =>
     apiClient.get<VendorResponse>(`/vendors/${id}`).then((r) => r.data),
-
-  /** POST /api/v1/vendors */
   create: (body: VendorCreateRequest): Promise<VendorResponse> =>
-    apiClient.post<VendorResponse>("/vendors", body).then((r) => r.data),
+    apiClient.post<VendorResponse>('/vendors', body).then((r) => r.data),
 };
 
-// ─── Requisition / Purchase Request API ──────────────────────────────────────
-
 export const requisitionApi = {
-  /**
-   * GET /api/v1/requisitions?requesterEmployeeId={id}
-   * Returns requisitions for a specific employee.
-   */
   listByRequester: (requesterEmployeeId: string): Promise<RequisitionResponse[]> =>
-    apiClient
-      .get<RequisitionResponse[]>("/requisitions", { requesterEmployeeId })
-      .then((r) => r.data),
-
-  /** GET /api/v1/requisitions/{id} */
+    apiClient.get<RequisitionResponse[]>('/requisitions', { requesterEmployeeId }).then((r) => r.data),
   getById: (id: number | string): Promise<RequisitionResponse> =>
     apiClient.get<RequisitionResponse>(`/requisitions/${id}`).then((r) => r.data),
-
-  /** POST /api/v1/requisitions */
   create: (body: RequisitionCreateRequest): Promise<RequisitionResponse> =>
-    apiClient.post<RequisitionResponse>("/requisitions", body).then((r) => r.data),
-
-  /**
-   * POST /api/v1/requisitions/{id}/submit
-   * Transitions a DRAFT requisition to PENDING_APPROVAL.
-   */
+    apiClient.post<RequisitionResponse>('/requisitions', body).then((r) => r.data),
   submit: (id: number | string): Promise<RequisitionResponse> =>
     apiClient.post<RequisitionResponse>(`/requisitions/${id}/submit`).then((r) => r.data),
 };
 
-// ─── Approval API ─────────────────────────────────────────────────────────────
-
 export const approvalApi = {
-  /**
-   * POST /api/v1/approvals/requisitions/{requisitionId}
-   * The backend reads the approver identity from the JWT (Authentication.getName()).
-   * action must be one of: APPROVE | REJECT | RETURN
-   */
+  listPending: (): Promise<RequisitionResponse[]> =>
+    apiClient.get<RequisitionResponse[]>('/approvals/pending').then((r) => r.data),
   decideOnRequisition: (
     requisitionId: number | string,
     body: RequisitionApproveRequest
   ): Promise<RequisitionResponse> =>
-    apiClient
-      .post<RequisitionResponse>(`/approvals/requisitions/${requisitionId}`, body)
-      .then((r) => r.data),
+    apiClient.post<RequisitionResponse>(`/approvals/requisitions/${requisitionId}`, body).then((r) => r.data),
 };
-
-// ─── RFQ API ──────────────────────────────────────────────────────────────────
 
 export const rfqApi = {
-  /** GET /api/v1/rfqs/{id} */
-  getById: (id: number | string): Promise<RFQEntity> =>
-    apiClient.get<RFQEntity>(`/rfqs/${id}`).then((r) => r.data),
-
-  /** POST /api/v1/rfqs */
-  create: (body: RFQCreateRequest): Promise<RFQEntity> =>
-    apiClient.post<RFQEntity>("/rfqs", body).then((r) => r.data),
+  list: (): Promise<RFQResponse[]> =>
+    apiClient.get<RFQResponse[]>('/rfqs').then((r) => r.data),
+  getById: (id: number | string): Promise<RFQResponse> =>
+    apiClient.get<RFQResponse>(`/rfqs/${id}`).then((r) => r.data),
+  create: (body: RFQCreateRequest): Promise<RFQResponse> =>
+    apiClient.post<RFQResponse>('/rfqs', body).then((r) => r.data),
 };
-
-// ─── Purchase Order API ───────────────────────────────────────────────────────
 
 export const purchaseOrderApi = {
-  /** GET /api/v1/purchase-orders/{id} */
+  list: (): Promise<PurchaseOrderResponse[]> =>
+    apiClient.get<PurchaseOrderResponse[]>('/purchase-orders').then((r) => r.data),
   getById: (id: number | string): Promise<PurchaseOrderResponse> =>
     apiClient.get<PurchaseOrderResponse>(`/purchase-orders/${id}`).then((r) => r.data),
-
-  /** POST /api/v1/purchase-orders */
   create: (body: PurchaseOrderCreateRequest): Promise<PurchaseOrderResponse> =>
-    apiClient.post<PurchaseOrderResponse>("/purchase-orders", body).then((r) => r.data),
+    apiClient.post<PurchaseOrderResponse>('/purchase-orders', body).then((r) => r.data),
 };
-
-// ─── Goods Receipt API ────────────────────────────────────────────────────────
 
 export const goodsReceiptApi = {
-  /** GET /api/v1/goods-receipts/{id} */
-  getById: (id: number | string): Promise<GoodsReceiptNoteEntity> =>
-    apiClient.get<GoodsReceiptNoteEntity>(`/goods-receipts/${id}`).then((r) => r.data),
-
-  /** POST /api/v1/goods-receipts */
-  create: (body: GoodsReceiptRequest): Promise<GoodsReceiptNoteEntity> =>
-    apiClient.post<GoodsReceiptNoteEntity>("/goods-receipts", body).then((r) => r.data),
+  list: (): Promise<GoodsReceiptResponse[]> =>
+    apiClient.get<GoodsReceiptResponse[]>('/goods-receipts').then((r) => r.data),
+  getById: (id: number | string): Promise<GoodsReceiptResponse> =>
+    apiClient.get<GoodsReceiptResponse>(`/goods-receipts/${id}`).then((r) => r.data),
+  create: (body: GoodsReceiptRequest): Promise<GoodsReceiptResponse> =>
+    apiClient.post<GoodsReceiptResponse>('/goods-receipts', body).then((r) => r.data),
 };
-
-// ─── Invoice API ──────────────────────────────────────────────────────────────
 
 export const invoiceApi = {
-  /** POST /api/v1/invoices */
-  submit: (body: InvoiceRequest): Promise<InvoiceEntity> =>
-    apiClient.post<InvoiceEntity>("/invoices", body).then((r) => r.data),
+  list: (): Promise<InvoiceResponse[]> =>
+    apiClient.get<InvoiceResponse[]>('/invoices').then((r) => r.data),
+  getById: (id: number | string): Promise<InvoiceResponse> =>
+    apiClient.get<InvoiceResponse>(`/invoices/${id}`).then((r) => r.data),
+  submit: (body: InvoiceRequest): Promise<InvoiceResponse> =>
+    apiClient.post<InvoiceResponse>('/invoices', body).then((r) => r.data),
 };
 
-// ─── Helper: map backend PRStatus to frontend display label ──────────────────
+export const contractApi = {
+  list: (): Promise<ContractResponse[]> =>
+    apiClient.get<ContractResponse[]>('/contracts').then((r) => r.data),
+  getById: (id: number | string): Promise<ContractResponse> =>
+    apiClient.get<ContractResponse>(`/contracts/${id}`).then((r) => r.data),
+  create: (body: ContractCreateRequest): Promise<ContractResponse> =>
+    apiClient.post<ContractResponse>('/contracts', body).then((r) => r.data),
+};
+
+export const quotationApi = {
+  list: (rfqId?: number | string): Promise<QuotationResponse[]> =>
+    rfqId
+      ? apiClient.get<QuotationResponse[]>(`/quotations?rfqId=${rfqId}`).then((r) => r.data)
+      : apiClient.get<QuotationResponse[]>('/quotations').then((r) => r.data),
+  getById: (id: number | string): Promise<QuotationResponse> =>
+    apiClient.get<QuotationResponse>(`/quotations/${id}`).then((r) => r.data),
+  create: (body: QuotationCreateRequest): Promise<QuotationResponse> =>
+    apiClient.post<QuotationResponse>('/quotations', body).then((r) => r.data),
+  select: (id: number | string): Promise<QuotationResponse> =>
+    apiClient.post<QuotationResponse>(`/quotations/${id}/select`).then((r) => r.data),
+};
+
+export const dashboardApi = {
+  getStats: (): Promise<DashboardStatsResponse> =>
+    apiClient.get<DashboardStatsResponse>('/dashboard/stats').then((r) => r.data),
+};
 
 export function prStatusLabel(status: BackendPRStatus): string {
   const map: Record<BackendPRStatus, string> = {
-    DRAFT: "Draft",
-    PENDING_APPROVAL: "Pending Approval",
-    APPROVED: "Approved",
-    REJECTED: "Rejected",
-    PO_CREATED: "PO Created",
+    DRAFT: 'Draft',
+    PENDING_APPROVAL: 'Pending Approval',
+    APPROVED: 'Approved',
+    REJECTED: 'Rejected',
+    PO_CREATED: 'PO Created',
   };
   return map[status] ?? status;
 }
 
-/** Badge colour class for a given backend PRStatus */
 export function prStatusBadge(status: BackendPRStatus): string {
   const map: Record<BackendPRStatus, string> = {
-    DRAFT:            "bg-gray-100 text-gray-600",
-    PENDING_APPROVAL: "bg-amber-100 text-amber-700",
-    APPROVED:         "bg-green-100 text-green-700",
-    REJECTED:         "bg-red-100 text-red-700",
-    PO_CREATED:       "bg-blue-100 text-blue-700",
+    DRAFT: 'bg-gray-100 text-gray-600',
+    PENDING_APPROVAL: 'bg-amber-100 text-amber-700',
+    APPROVED: 'bg-green-100 text-green-700',
+    REJECTED: 'bg-red-100 text-red-700',
+    PO_CREATED: 'bg-blue-100 text-blue-700',
   };
-  return map[status] ?? "bg-gray-100 text-gray-600";
+  return map[status] ?? 'bg-gray-100 text-gray-600';
 }
 
-/** Badge colour class for a given backend POStatus */
 export function poStatusBadge(status: BackendPOStatus): string {
   const map: Record<BackendPOStatus, string> = {
-    DRAFT:               "bg-gray-100 text-gray-600",
-    SENT:                "bg-blue-100 text-blue-700",
-    CONFIRMED:           "bg-green-100 text-green-700",
-    PARTIALLY_RECEIVED:  "bg-amber-100 text-amber-700",
-    COMPLETED:           "bg-teal-100 text-teal-700",
-    CANCELLED:           "bg-red-100 text-red-700",
+    DRAFT: 'bg-gray-100 text-gray-600',
+    SENT: 'bg-blue-100 text-blue-700',
+    CONFIRMED: 'bg-green-100 text-green-700',
+    PARTIALLY_RECEIVED: 'bg-amber-100 text-amber-700',
+    COMPLETED: 'bg-teal-100 text-teal-700',
+    CANCELLED: 'bg-red-100 text-red-700',
   };
-  return map[status] ?? "bg-gray-100 text-gray-600";
+  return map[status] ?? 'bg-gray-100 text-gray-600';
 }
 
-// ─── Re-export shared error utilities ─────────────────────────────────────────
 export { handleApiError, isApiError };
 export type { ApiError };

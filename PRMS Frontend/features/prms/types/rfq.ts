@@ -199,6 +199,7 @@ export interface EvaluationResult {
 }
 
 export interface RFQFilter {
+  [key: string]: unknown;
   status?: RFQStatus;
   search?: string;
   startDate?: string;
@@ -210,6 +211,7 @@ export interface RFQFilter {
 }
 
 export interface QuotationFilter {
+  [key: string]: unknown;
   status?: QuotationStatus;
   rfqId?: string;
   supplierId?: string;
