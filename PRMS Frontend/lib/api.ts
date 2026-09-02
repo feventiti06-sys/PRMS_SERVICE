@@ -194,4 +194,9 @@ export const queryKeys = {
   auditLogs: ['audit-logs'] as const,
   settings: ['settings'] as const,
   workflows: ['workflows'] as const,
+  integration: {
+    employee: (id: string) => ['integration', 'hrm', 'employee', id] as const,
+    inventory: (itemCode: string) => ['integration', 'mms', 'inventory', itemCode] as const,
+    inventoryItems: ['integration', 'mms', 'items'] as const,
+  },
 };

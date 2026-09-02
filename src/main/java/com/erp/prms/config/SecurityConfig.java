@@ -86,6 +86,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/quotations/**").hasAnyRole("PROCUREMENT_ADMIN", "REQUESTER", "SUPPLIER")
                         .requestMatchers("/api/v1/dashboard/**").hasAnyRole("PROCUREMENT_ADMIN", "REQUESTER", "SUPPLIER")
                         .requestMatchers("/api/v1/audit-logs/**").hasRole("PROCUREMENT_ADMIN")
+                        .requestMatchers("/api/v1/integration/**").hasAnyRole("PROCUREMENT_ADMIN", "REQUESTER", "SUPPLIER")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))

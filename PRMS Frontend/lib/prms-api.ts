@@ -339,3 +339,44 @@ export function poStatusBadge(status: BackendPOStatus): string {
 
 export { handleApiError, isApiError };
 export type { ApiError };
+
+export interface EmployeeResponse {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  departmentCode: string;
+  jobTitle: string;
+  active: boolean;
+}
+
+export interface InventoryCheckResponse {
+  itemCode: string;
+  requestedQuantity: number;
+  availableQuantity: number | null;
+  warehouseCode: string | null;
+  available: boolean;
+  reason: string | null;
+}
+
+export const integrationApi = {
+  getEmployee: (employeeId: string): Promise<EmployeeResponse | null> =>
+    apiClient.get<EmployeeResponse>(`/integration/hrm/employees/${employeeId}`)
+      .then((r) => r.data)
+      .catch(() => null),
+
+  validateEmployee: (employeeId: string): Promise<{ employeeId: string; valid: boolean }> =>
+    apiClient.get<{ employeeId: string; valid: boolean }>(
+      `/integration/hrm/employees/${employeeId}/validate`
+    ).then((r) => r.data),
+
+  checkInventory: (itemCode: string, quantity?: number): Promise<InventoryCheckResponse> =>
+    apiClient.get<InventoryCheckResponse>('/integration/mms/inventory/check', {
+      itemCode,
+      quantity: quantity ?? 1,
+    }).then((r) => r.data),
+
+  listInventoryItems: (): Promise<Record<string, unknown>[]> =>
+    apiClient.get<Record<string, unknown>[]>('/integration/mms/inventory/items')
+      .then((r) => r.data),
+};
