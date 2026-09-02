@@ -10,18 +10,24 @@ import com.erp.prms.repository.PurchaseOrderRepository;
 import com.erp.prms.repository.PurchaseRequisitionRepository;
 import com.erp.prms.repository.VendorRepository;
 import com.erp.prms.service.events.ProcurementEventPublisher;
+import com.erp.prms.service.integration.InventoryIntegrationService;
 import com.erp.prms.service.procurement.ProcurementService;
 import com.erp.prms.util.POGenerator;
 import com.erp.prms.validator.ProcurementPolicyValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Service
 @Transactional
 public class ProcurementServiceImpl implements ProcurementService {
+
+    private static final Logger log = LoggerFactory.getLogger(ProcurementServiceImpl.class);
 
     private final PurchaseOrderRepository po;
     private final PurchaseRequisitionRepository pr;
@@ -30,6 +36,7 @@ public class ProcurementServiceImpl implements ProcurementService {
     private final POGenerator generator;
     private final ProcurementPolicyValidator policy;
     private final ProcurementEventPublisher events;
+    private final InventoryIntegrationService inventoryService;
 
     public ProcurementServiceImpl(
             PurchaseOrderRepository po,
@@ -38,7 +45,8 @@ public class ProcurementServiceImpl implements ProcurementService {
             PurchaseOrderMapper mapper,
             POGenerator generator,
             ProcurementPolicyValidator policy,
-            ProcurementEventPublisher events) {
+            ProcurementEventPublisher events,
+            InventoryIntegrationService inventoryService) {
         this.po = po;
         this.pr = pr;
         this.vendors = vendors;
@@ -46,12 +54,14 @@ public class ProcurementServiceImpl implements ProcurementService {
         this.generator = generator;
         this.policy = policy;
         this.events = events;
+        this.inventoryService = inventoryService;
     }
 
     @Override
     public PurchaseOrderResponse createPurchaseOrder(PurchaseOrderCreateRequest request) {
         var requisition = pr.findById(request.getPurchaseRequisitionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Requisition not found: " + request.getPurchaseRequisitionId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Requisition not found: " + request.getPurchaseRequisitionId()));
 
         if (requisition.getStatus() != PRStatus.APPROVED) {
             throw new IllegalStateException("Only approved requisitions can create POs");
@@ -62,6 +72,15 @@ public class ProcurementServiceImpl implements ProcurementService {
 
         policy.validateVendor(vendor);
         policy.validateAmount(request.getTotalAmount());
+
+        var availability = inventoryService.checkAvailability(
+                requisition.getRequisitionNumber(),
+                BigDecimal.ONE
+        );
+        if (!availability.isAvailable()) {
+            log.info("MMS inventory check: item={} not available — reason={}. Proceeding with PO creation.",
+                    requisition.getRequisitionNumber(), availability.getReason());
+        }
 
         PurchaseOrder entity = mapper.toEntity(request);
         entity.setPurchaseOrderNumber(generator.next());

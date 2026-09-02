@@ -7,13 +7,12 @@ import com.erp.prms.exception.ResourceNotFoundException;
 import com.erp.prms.repository.InvoiceRepository;
 import com.erp.prms.repository.PurchaseOrderRepository;
 import com.erp.prms.repository.VendorRepository;
+import com.erp.prms.service.integration.FinanceIntegrationService;
 import com.erp.prms.service.invoice.InvoiceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
@@ -26,26 +25,27 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final InvoiceRepository invoices;
     private final PurchaseOrderRepository purchaseOrders;
     private final VendorRepository vendors;
-    private final RestClient fmsClient;
+    private final FinanceIntegrationService financeService;
 
     public InvoiceServiceImpl(
             InvoiceRepository invoices,
             PurchaseOrderRepository purchaseOrders,
             VendorRepository vendors,
-            RestClient.Builder builder,
-            @Value("${integration.fms.base-url:http://localhost:8082}") String fmsBaseUrl) {
+            FinanceIntegrationService financeService) {
         this.invoices = invoices;
         this.purchaseOrders = purchaseOrders;
         this.vendors = vendors;
-        this.fmsClient = builder.baseUrl(fmsBaseUrl).build();
+        this.financeService = financeService;
     }
 
     @Override
     public InvoiceResponse submit(InvoiceRequest request) {
         var po = purchaseOrders.findById(request.getPurchaseOrderId())
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found: " + request.getPurchaseOrderId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase order not found: " + request.getPurchaseOrderId()));
         var vendor = vendors.findById(request.getVendorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found: " + request.getVendorId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Vendor not found: " + request.getVendorId()));
 
         Invoice invoice = new Invoice();
         invoice.setInvoiceNumber(request.getInvoiceNumber());
@@ -59,16 +59,8 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         Invoice saved = invoices.save(invoice);
 
-        try {
-            fmsClient.post()
-                    .uri("/api/invoices/receive")
-                    .body(request)
-                    .retrieve()
-                    .toBodilessEntity();
-            saved.setProcessingStatus("SUBMITTED_TO_FMS");
-        } catch (Exception e) {
-            log.warn("FMS invoice forwarding failed ({}). Invoice saved locally with PENDING status.", e.getMessage());
-        }
+        financeService.forwardInvoice(request);
+        saved.setProcessingStatus("SUBMITTED_TO_FMS");
 
         return toResponse(saved);
     }

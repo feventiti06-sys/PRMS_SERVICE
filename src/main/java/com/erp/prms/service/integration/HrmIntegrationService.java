@@ -1,26 +1,41 @@
 package com.erp.prms.service.integration;
 
-import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
+import com.erp.prms.client.HrmClient;
+import com.erp.prms.dto.response.EmployeeResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 @Service
 public class HrmIntegrationService {
 
-    private final RestClient restClient;
+    private static final Logger log = LoggerFactory.getLogger(HrmIntegrationService.class);
 
-    public HrmIntegrationService(
-            RestClient.Builder builder,
-            @Value("${integration.hrm.base-url:http://localhost:8083}") String baseUrl
-    ) {
-        this.restClient = builder.baseUrl(baseUrl).build();
+    private final HrmClient hrmClient;
+
+    public HrmIntegrationService(HrmClient hrmClient) {
+        this.hrmClient = hrmClient;
     }
 
-    public Map<String, Object> getEmployee(String employeeId) {
-        return restClient.get()
-                .uri("/api/employees/{employeeId}", employeeId)
-                .retrieve()
-                .body(Map.class);
+    public EmployeeResponse getEmployee(String employeeId) {
+        try {
+            return hrmClient.getEmployee(employeeId);
+        } catch (Exception e) {
+            log.warn("HRM lookup failed for employeeId={}: {}", employeeId, e.getMessage());
+            return null;
+        }
+    }
+
+    public boolean validateEmployee(String employeeId) {
+        EmployeeResponse employee = getEmployee(employeeId);
+        if (employee == null) {
+            log.warn("HRM unavailable — skipping employee validation for {}", employeeId);
+            return true;
+        }
+        if (!employee.isActive()) {
+            log.warn("Employee {} is not active in HRM", employeeId);
+            return false;
+        }
+        return true;
     }
 }

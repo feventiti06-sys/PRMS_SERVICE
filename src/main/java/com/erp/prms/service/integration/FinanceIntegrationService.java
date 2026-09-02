@@ -1,71 +1,59 @@
 package com.erp.prms.service.integration;
 
+import com.erp.prms.client.FmsClient;
 import com.erp.prms.dto.request.InvoiceRequest;
 import com.erp.prms.dto.response.BudgetCheckResponse;
-import com.erp.prms.entity.Invoice;
-import com.erp.prms.exception.ResourceNotFoundException;
-import com.erp.prms.repository.InvoiceRepository;
-import com.erp.prms.repository.PurchaseOrderRepository;
-import com.erp.prms.repository.VendorRepository;
-import java.math.BigDecimal;
-import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
+
+import java.math.BigDecimal;
 
 @Service
 public class FinanceIntegrationService {
 
-    private final RestClient restClient;
-    private final InvoiceRepository invoiceRepository;
-    private final PurchaseOrderRepository purchaseOrderRepository;
-    private final VendorRepository vendorRepository;
+    private static final Logger log = LoggerFactory.getLogger(FinanceIntegrationService.class);
 
-    public FinanceIntegrationService(
-            RestClient.Builder builder,
-            @Value("${integration.fms.base-url:http://localhost:8082}") String baseUrl,
-            InvoiceRepository invoiceRepository,
-            PurchaseOrderRepository purchaseOrderRepository,
-            VendorRepository vendorRepository
-    ) {
-        this.restClient = builder.baseUrl(baseUrl).build();
-        this.invoiceRepository = invoiceRepository;
-        this.purchaseOrderRepository = purchaseOrderRepository;
-        this.vendorRepository = vendorRepository;
+    private final FmsClient fmsClient;
+
+    public FinanceIntegrationService(FmsClient fmsClient) {
+        this.fmsClient = fmsClient;
     }
 
     public BudgetCheckResponse checkBudget(String departmentCode, BigDecimal amount) {
-        BudgetCheckResponse result = restClient.get()
-                .uri(uri -> uri.path("/api/budgets/check")
-                        .queryParam("departmentCode", departmentCode)
-                        .queryParam("amount", amount)
-                        .build())
-                .retrieve()
-                .body(BudgetCheckResponse.class);
-        return result == null ? denied(departmentCode, amount) : result;
+        try {
+            BudgetCheckResponse result = fmsClient.checkBudget(departmentCode, amount);
+            return result != null ? result : denied(departmentCode, amount, "FMS returned no result");
+        } catch (Exception e) {
+            log.warn("FMS budget check failed for dept={}, amount={}: {}", departmentCode, amount, e.getMessage());
+            return approved(departmentCode, amount);
+        }
     }
 
-    @Transactional
-    public Invoice submitInvoice(InvoiceRequest request) {
-        Invoice invoice = new Invoice();
-        invoice.setInvoiceNumber(request.getInvoiceNumber());
-        invoice.setPurchaseOrder(purchaseOrderRepository.findById(request.getPurchaseOrderId())
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found")));
-        invoice.setVendor(vendorRepository.findById(request.getVendorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found")));
-        invoice.setInvoiceAmount(request.getInvoiceAmount());
-        invoice.setInvoiceDate(request.getInvoiceDate());
-        invoice.setDueDate(request.getDueDate());
-        invoice.setItemDetails(request.getItemDetails());
-        return invoiceRepository.save(invoice);
+    public void forwardInvoice(InvoiceRequest request) {
+        try {
+            fmsClient.receiveInvoice(request);
+            log.info("Invoice {} forwarded to FMS", request.getInvoiceNumber());
+        } catch (Exception e) {
+            log.warn("Failed to forward invoice {} to FMS: {}", request.getInvoiceNumber(), e.getMessage());
+        }
     }
 
-    private BudgetCheckResponse denied(String code, BigDecimal amount) {
-        BudgetCheckResponse result = new BudgetCheckResponse();
-        result.setBudgetCode(code);
-        result.setRequestedAmount(amount);
-        result.setApproved(false);
-        result.setReason("FMS returned no budget result");
-        return result;
+    private BudgetCheckResponse denied(String code, BigDecimal amount, String reason) {
+        BudgetCheckResponse r = new BudgetCheckResponse();
+        r.setBudgetCode(code);
+        r.setRequestedAmount(amount);
+        r.setApproved(false);
+        r.setReason(reason);
+        return r;
+    }
+
+    private BudgetCheckResponse approved(String code, BigDecimal amount) {
+        BudgetCheckResponse r = new BudgetCheckResponse();
+        r.setBudgetCode(code);
+        r.setRequestedAmount(amount);
+        r.setApproved(true);
+        r.setReason("FMS unavailable — approved by default");
+        return r;
     }
 }

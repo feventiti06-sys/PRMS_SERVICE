@@ -40,8 +40,20 @@ integration:
     base-url: ${FMS_BASE_URL:http://localhost:8082}
   hrm:
     base-url: ${HRM_BASE_URL:http://localhost:8083}
+  mms:
+    base-url: ${MMS_BASE_URL:http://localhost:8081}
   inventory:
-    base-url: ${INVENTORY_BASE_URL:http://localhost:8081}
+    base-url: ${MMS_BASE_URL:http://localhost:8081}
+
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: 5000
+        read-timeout: 10000
+        logger-level: BASIC
+  circuitbreaker:
+    enabled: false
 
 management:
   endpoints:
@@ -51,3 +63,8 @@ management:
   endpoint:
     health:
       show-details: never
+
+logging:
+  level:
+    com.erp.prms.client: DEBUG
+    com.erp.prms.service.integration: INFO
